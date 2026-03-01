@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, Youtube, Sparkles, Camera, Wand2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { YouTubePopup } from '@/components/YouTubePopup';
 
 interface GalleryImage {
   src: string;
@@ -65,7 +64,7 @@ function ImageLightbox({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] w-full h-[95vh] bg-black/98 backdrop-blur-2xl border-white/10 p-0 overflow-hidden">
+      <DialogContent className="max-w-[96vw] w-[96vw] h-[96vh] bg-black/98 backdrop-blur-2xl border-white/10 p-0 overflow-hidden">
         <div className="h-full flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between p-4 flex-shrink-0">
@@ -121,7 +120,7 @@ function ImageLightbox({
                 <img
                   src={currentImage.src}
                   alt={currentImage.title}
-                  className="max-w-[95%] max-h-[75vh] w-auto h-auto object-contain rounded-lg shadow-2xl transition-transform duration-300 hover:scale-[1.03]"
+                  className="max-w-[90vw] max-h-[80vh] w-auto h-auto object-contain rounded-lg shadow-2xl transition-transform duration-300 hover:scale-[1.15]"
                 />
               </motion.div>
             </AnimatePresence>
@@ -165,7 +164,6 @@ function ImageLightbox({
 export function CreativeGallerySection() {
   const [selectedImage, setSelectedImage] = useState<number | null>(null);
   const [filter, setFilter] = useState<'all' | 'photo-manipulation'>('all');
-  const [showYouTubePopup, setShowYouTubePopup] = useState(false);
   const [showAll, setShowAll] = useState(false);
 
   const filteredImages = filter === 'all'
@@ -196,14 +194,16 @@ export function CreativeGallerySection() {
             Explore magical worlds, portals, and imaginative compositions.
           </p>
 
-          {/* YouTube Channel Link - Opens Popup */}
-          <button
-            onClick={() => setShowYouTubePopup(true)}
+          {/* YouTube Channel Link */}
+          <a
+            href="https://www.youtube.com/@FourMarfelous"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-3 px-6 py-3 bg-red-600 hover:bg-red-700 rounded-full font-medium transition-colors"
           >
             <Youtube className="w-5 h-5" />
             Subscribe on YouTube
-          </button>
+          </a>
         </motion.div>
 
         {/* Stats */}
@@ -320,13 +320,15 @@ export function CreativeGallerySection() {
           className="mt-16 text-center"
         >
           <p className="text-white/40 mb-4">Want to learn how these are made?</p>
-          <button
-            onClick={() => setShowYouTubePopup(true)}
+          <a
+            href="https://www.youtube.com/@FourMarfelous"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-6 py-3 glass rounded-full hover:bg-white/10 transition-colors"
           >
             <Sparkles className="w-4 h-4 text-electric" />
             Watch tutorials on YouTube
-          </button>
+          </a>
         </motion.div>
       </div>
 
@@ -340,12 +342,6 @@ export function CreativeGallerySection() {
           onNavigate={setSelectedImage}
         />
       )}
-
-      {/* YouTube Popup */}
-      <YouTubePopup
-        isOpen={showYouTubePopup}
-        onClose={() => setShowYouTubePopup(false)}
-      />
     </section>
   );
 }

@@ -156,10 +156,10 @@ function ImageGalleryDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl w-[95vw] h-[90vh] bg-surface/95 backdrop-blur-2xl border-white/10 p-0 overflow-hidden">
+      <DialogContent className="max-w-[96vw] w-[96vw] h-[96vh] bg-surface/95 backdrop-blur-2xl border-white/10 p-0 overflow-hidden">
         <div className="h-full flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-white/10">
+          <div className="flex items-center justify-between p-4 border-b border-white/10 flex-shrink-0">
             <div>
               <h3 className="font-semibold text-lg">{projectTitle}</h3>
               <p className="text-sm text-white/50">{currentIndex + 1} of {images.length}</p>
@@ -175,22 +175,24 @@ function ImageGalleryDialog({
           {/* Image Viewer */}
           <div className="flex-1 flex items-center justify-center relative p-6 overflow-auto">
             {/* Navigation Buttons */}
-            {images.length > 1 && (
-              <>
-                <button
-                  onClick={prevImage}
-                  className="absolute left-4 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
-                >
-                  <ChevronLeft className="w-6 h-6" />
-                </button>
-                <button
-                  onClick={nextImage}
-                  className="absolute right-4 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
-                >
-                  <ChevronRight className="w-6 h-6" />
-                </button>
-              </>
-            )}
+            {
+              images.length > 1 && (
+                <>
+                  <button
+                    onClick={prevImage}
+                    className="absolute left-4 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  <button
+                    onClick={nextImage}
+                    className="absolute right-4 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                </>
+              )
+            }
 
             {/* Image */}
             <AnimatePresence mode="wait">
@@ -216,7 +218,7 @@ function ImageGalleryDialog({
                 <img
                   src={currentImage.src}
                   alt={currentImage.caption}
-                  className="max-w-[95%] max-h-[75vh] w-auto h-auto object-contain rounded-lg shadow-2xl transition-transform duration-300 hover:scale-105"
+                  className="max-w-[90vw] max-h-[80vh] w-auto h-auto object-contain rounded-lg shadow-2xl transition-transform duration-300 hover:scale-[1.15]"
                 />
               </motion.div>
             </AnimatePresence>
@@ -242,24 +244,26 @@ function ImageGalleryDialog({
           </div>
 
           {/* Thumbnail Strip */}
-          {images.length > 1 && (
-            <div className="p-4 border-t border-white/10 bg-black/40">
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide justify-center">
-                {images.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setCurrentIndex(idx)}
-                    className={cn(
-                      'flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all',
-                      currentIndex === idx ? 'border-electric' : 'border-transparent opacity-50 hover:opacity-75'
-                    )}
-                  >
-                    <img src={img.src} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
+          {
+            images.length > 1 && (
+              <div className="p-4 border-t border-white/10 bg-black/40">
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide justify-center">
+                  {images.map((img, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentIndex(idx)}
+                      className={cn(
+                        'flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all',
+                        currentIndex === idx ? 'border-electric' : 'border-transparent opacity-50 hover:opacity-75'
+                      )}
+                    >
+                      <img src={img.src} alt="" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )
+          }
         </div>
       </DialogContent>
     </Dialog>

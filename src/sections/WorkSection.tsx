@@ -127,16 +127,16 @@ const projects: Project[] = [
 ];
 
 // Image Gallery Dialog Component
-function ImageGalleryDialog({ 
-  isOpen, 
-  onClose, 
-  images, 
+function ImageGalleryDialog({
+  isOpen,
+  onClose,
+  images,
   projectTitle,
-  initialIndex = 0 
-}: { 
-  isOpen: boolean; 
-  onClose: () => void; 
-  images: ProjectImage[]; 
+  initialIndex = 0
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  images: ProjectImage[];
   projectTitle: string;
   initialIndex?: number;
 }) {
@@ -166,7 +166,7 @@ function ImageGalleryDialog({
             </div>
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+              className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors !outline-none"
             >
               <X className="w-5 h-5" />
             </button>
@@ -196,16 +196,27 @@ function ImageGalleryDialog({
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentIndex}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.2 }}
-                className="flex items-center justify-center w-full h-full"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.4}
+                onDragEnd={(_, { offset, velocity }) => {
+                  const swipe = offset.x;
+                  if (swipe < -50 || velocity.x < -500) {
+                    nextImage();
+                  } else if (swipe > 50 || velocity.x > 500) {
+                    prevImage();
+                  }
+                }}
+                className="flex items-center justify-center w-full h-full cursor-grab active:cursor-grabbing"
               >
                 <img
                   src={currentImage.src}
                   alt={currentImage.caption}
-                  className="max-w-[90%] max-h-[65vh] w-auto h-auto object-contain rounded-lg shadow-2xl"
+                  className="max-w-[95%] max-h-[75vh] w-auto h-auto object-contain rounded-lg shadow-2xl transition-transform duration-300 hover:scale-105"
                 />
               </motion.div>
             </AnimatePresence>
@@ -232,8 +243,8 @@ function ImageGalleryDialog({
 
           {/* Thumbnail Strip */}
           {images.length > 1 && (
-            <div className="p-4 border-t border-white/10">
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            <div className="p-4 border-t border-white/10 bg-black/40">
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide justify-center">
                 {images.map((img, idx) => (
                   <button
                     key={idx}
@@ -278,7 +289,7 @@ export function WorkSection() {
             Projects that <span className="text-gradient">define</span> me
           </h2>
           <p className="text-white/60 text-lg max-w-2xl">
-            A curated collection of UI/UX designs, web applications, and creative work 
+            A curated collection of UI/UX designs, web applications, and creative work
             that showcase my range and expertise across different domains.
           </p>
         </motion.div>
@@ -337,7 +348,7 @@ export function WorkSection() {
                   {/* Card */}
                   <div className="glass rounded-3xl overflow-hidden hover:bg-white/5 transition-all duration-300">
                     {/* Hero Image */}
-                    <div 
+                    <div
                       className="relative aspect-[4/3] overflow-hidden"
                       onClick={() => project.images.length > 0 && setGalleryProject({ project, index: 0 })}
                     >
@@ -347,7 +358,7 @@ export function WorkSection() {
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                      
+
                       {/* Platform Badges */}
                       <div className="absolute top-4 left-4 flex gap-2">
                         {project.platforms.map((platform) => (
@@ -361,11 +372,11 @@ export function WorkSection() {
                       <div className="absolute top-4 right-4">
                         <span className={cn(
                           'px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1',
-                          project.category === 'design' 
-                            ? 'bg-purple-500/80 text-white' 
+                          project.category === 'design'
+                            ? 'bg-purple-500/80 text-white'
                             : project.category === 'development'
-                            ? 'bg-blue-500/80 text-white'
-                            : 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
+                              ? 'bg-blue-500/80 text-white'
+                              : 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
                         )}>
                           {project.category === 'design' && <Palette className="w-3 h-3" />}
                           {project.category === 'development' && <Code className="w-3 h-3" />}
@@ -390,7 +401,7 @@ export function WorkSection() {
                       <p className="text-white/60 text-sm mb-4 line-clamp-2">
                         {project.description}
                       </p>
-                      
+
                       {/* Technologies */}
                       <div className="flex flex-wrap gap-2 mb-4">
                         {project.technologies.slice(0, 3).map((tech) => (
@@ -439,8 +450,8 @@ export function WorkSection() {
               className="text-center py-20"
             >
               <p className="text-white/60 mb-4">Explore my creative work on the dedicated gallery page</p>
-              <a 
-                href="#creative" 
+              <a
+                href="#creative"
                 className="inline-flex items-center gap-2 px-6 py-3 bg-electric rounded-full font-medium hover:bg-electric/90 transition-colors"
               >
                 <Palette className="w-5 h-5" />
@@ -465,8 +476,8 @@ export function WorkSection() {
                       selectedProject.category === 'design'
                         ? 'bg-purple-500/20 text-purple-400'
                         : selectedProject.category === 'development'
-                        ? 'bg-blue-500/20 text-blue-400'
-                        : 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-white'
+                          ? 'bg-blue-500/20 text-blue-400'
+                          : 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-white'
                     )}>
                       {selectedProject.category === 'design' ? 'UI/UX Design' : selectedProject.category === 'development' ? 'Development' : 'Design + Development'}
                     </span>

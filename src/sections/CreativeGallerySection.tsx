@@ -101,16 +101,27 @@ function ImageLightbox({
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentIndex}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.2 }}
-                className="flex items-center justify-center w-full h-full"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.4}
+                onDragEnd={(_, { offset, velocity }) => {
+                  const swipe = offset.x;
+                  if (swipe < -50 || velocity.x < -500) {
+                    nextImage();
+                  } else if (swipe > 50 || velocity.x > 500) {
+                    prevImage();
+                  }
+                }}
+                className="flex items-center justify-center w-full h-full cursor-grab active:cursor-grabbing"
               >
                 <img
                   src={currentImage.src}
                   alt={currentImage.title}
-                  className="max-w-full max-h-[70vh] w-auto h-auto object-contain rounded-lg shadow-2xl"
+                  className="max-w-[95%] max-h-[75vh] w-auto h-auto object-contain rounded-lg shadow-2xl transition-transform duration-300 hover:scale-[1.03]"
                 />
               </motion.div>
             </AnimatePresence>

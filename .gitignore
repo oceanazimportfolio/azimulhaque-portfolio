@@ -4,3 +4,7 @@ dist
 Thumbs.db
 .idea/
 
+# Local env files
+.env
+.env.local
+.env.*.local

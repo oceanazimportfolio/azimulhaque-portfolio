@@ -1,103 +1,89 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Zap, Target, Palette, RefreshCw } from 'lucide-react';
+import { Target, Palette, RefreshCw, MousePointerClick } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// Experience 1: Kinetic Typography Playground
-function KineticTypeExperience() {
-  const [text, setText] = useState('TYPE HERE');
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
+// Experience 1: Click Speed Test
+function ClickSpeedExperience() {
+  const [clicks, setClicks] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(5);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isFinished, setIsFinished] = useState(false);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    setMousePos({
-      x: (e.clientX - rect.left - rect.width / 2) / 20,
-      y: (e.clientY - rect.top - rect.height / 2) / 20,
-    });
-  }, []);
+  const startGame = () => {
+    setClicks(0);
+    setTimeLeft(5);
+    setIsPlaying(true);
+    setIsFinished(false);
+
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setIsPlaying(false);
+          setIsFinished(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   return (
-    <div 
-      ref={containerRef}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={() => setMousePos({ x: 0, y: 0 })}
-      className="h-full flex flex-col items-center justify-center p-6 cursor-crosshair"
-    >
-      <input
-        type="text"
-        value={text}
-        onChange={(e) => setText(e.target.value.toUpperCase())}
-        className="absolute top-4 left-4 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm w-48 focus:outline-none focus:border-electric"
-        placeholder="Type something..."
-      />
-      <div className="relative">
-        {text.split('').map((char, i) => (
-          <motion.span
-            key={i}
-            animate={{
-              x: mousePos.x * (i % 2 === 0 ? 1 : -1) * (i + 1) * 0.5,
-              y: mousePos.y * (i % 3 === 0 ? 1 : -1) * (i + 1) * 0.3,
-              rotate: mousePos.x * (i % 2 === 0 ? 1 : -1) * 0.5,
-            }}
-            transition={{ type: 'spring', stiffness: 150, damping: 15 }}
-            className="inline-block text-5xl md:text-7xl font-bold"
-            style={{
-              textShadow: `${mousePos.x * (i + 1) * 0.1}px ${mousePos.y * (i + 1) * 0.1}px 0 rgba(255, 46, 0, 0.5)`,
-            }}
+    <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+      {!isPlaying && !isFinished && (
+        <motion.button
+          initial={{ scale: 0.9 }}
+          animate={{ scale: 1 }}
+          onClick={startGame}
+          className="w-32 h-32 rounded-full bg-electric flex items-center justify-center text-white font-bold text-lg hover:scale-105 transition-transform"
+        >
+          START
+        </motion.button>
+      )}
+
+      {isPlaying && (
+        <div className="flex flex-col items-center">
+          <p className="text-xl font-bold text-white mb-6 bg-white/10 px-4 py-2 rounded-full">
+            Time: {timeLeft}s
+          </p>
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setClicks(c => c + 1)}
+            className="w-48 h-48 rounded-full bg-electric flex items-center justify-center text-white font-bold text-4xl shadow-[0_0_40px_rgba(255,46,0,0.4)] cursor-pointer select-none"
           >
-            {char === ' ' ? '\u00A0' : char}
-          </motion.span>
-        ))}
-      </div>
-      <p className="absolute bottom-4 text-white/40 text-sm">Move your cursor</p>
+            CLICK!
+          </motion.button>
+          <p className="text-2xl mt-6 font-medium">Score: {clicks}</p>
+        </div>
+      )}
+
+      {isFinished && (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+        >
+          <p className="text-5xl font-bold mb-2">{(clicks / 5).toFixed(1)} <span className="text-2xl text-white/50">CPS</span></p>
+          <p className="text-white/50 mb-8">Total Clicks: {clicks}</p>
+          <button
+            onClick={startGame}
+            className="px-8 py-3 bg-white/10 rounded-full text-sm font-medium hover:bg-white/20 transition-colors"
+          >
+            Try Again
+          </button>
+        </motion.div>
+      )}
+
+      {(!isPlaying || isFinished) && (
+        <p className="absolute bottom-4 text-white/40 text-sm text-center">
+          Test your clicking speed (clicks per second)
+        </p>
+      )}
     </div>
   );
 }
 
-// Experience 2: Magnetic Grid
-function MagneticGridExperience() {
-  const [hoveredCell, setHoveredCell] = useState<number | null>(null);
-  const gridSize = 8;
-
-  return (
-    <div className="h-full flex items-center justify-center p-6">
-      <div 
-        className="grid gap-2"
-        style={{ gridTemplateColumns: `repeat(${gridSize}, 1fr)` }}
-      >
-        {Array.from({ length: gridSize * gridSize }).map((_, i) => {
-          const isHovered = hoveredCell === i;
-          const distanceFromHover = hoveredCell !== null 
-            ? Math.abs(Math.floor(i / gridSize) - Math.floor(hoveredCell / gridSize)) 
-              + Math.abs((i % gridSize) - (hoveredCell % gridSize))
-            : 10;
-          
-          return (
-            <motion.div
-              key={i}
-              onMouseEnter={() => setHoveredCell(i)}
-              onMouseLeave={() => setHoveredCell(null)}
-              animate={{
-                scale: isHovered ? 1.5 : Math.max(0.7, 1 - distanceFromHover * 0.1),
-                backgroundColor: isHovered 
-                  ? '#FF2E00' 
-                  : distanceFromHover < 3 
-                    ? `rgba(255, 46, 0, ${0.3 - distanceFromHover * 0.1})`
-                    : 'rgba(255, 255, 255, 0.1)',
-              }}
-              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-              className="w-8 h-8 md:w-10 md:h-10 rounded-lg cursor-pointer"
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// Experience 3: Color Harmony Generator
+// Experience 2: Color Harmony Generator
 function ColorHarmonyExperience() {
   const [baseHue, setBaseHue] = useState(200);
   const [scheme, setScheme] = useState<'complementary' | 'triadic' | 'analogous'>('complementary');
@@ -133,7 +119,7 @@ function ColorHarmonyExperience() {
           </button>
         ))}
       </div>
-      
+
       <div className="flex gap-4 mb-6">
         {colors.map((hue, i) => (
           <motion.div
@@ -207,7 +193,7 @@ function ReactionTimeExperience() {
           START
         </motion.button>
       )}
-      
+
       {(state === 'waiting' || state === 'ready') && (
         <motion.button
           initial={{ scale: 0 }}
@@ -221,7 +207,7 @@ function ReactionTimeExperience() {
           {state === 'waiting' ? 'WAIT...' : 'CLICK!'}
         </motion.button>
       )}
-      
+
       {state === 'result' && (
         <motion.div
           initial={{ scale: 0 }}
@@ -240,7 +226,7 @@ function ReactionTimeExperience() {
           </button>
         </motion.div>
       )}
-      
+
       <p className="absolute bottom-4 text-white/40 text-sm text-center">
         Test your reaction speed
       </p>
@@ -250,19 +236,19 @@ function ReactionTimeExperience() {
 
 const experiences = [
   {
-    id: 'kinetic',
-    title: 'Kinetic Type',
-    description: 'Interactive typography that responds to your cursor',
-    icon: Sparkles,
-    component: KineticTypeExperience,
+    id: 'clickspeed',
+    title: 'Click Speed Test',
+    description: 'How many clicks per second?',
+    icon: MousePointerClick,
+    component: ClickSpeedExperience,
     color: 'from-purple-500/20 to-pink-500/20',
   },
   {
-    id: 'magnetic',
-    title: 'Magnetic Grid',
-    description: 'A grid of cells that attract and repel',
-    icon: Zap,
-    component: MagneticGridExperience,
+    id: 'reaction',
+    title: 'Reaction Test',
+    description: 'How fast are your reflexes?',
+    icon: Target,
+    component: ReactionTimeExperience,
     color: 'from-electric/20 to-orange-500/20',
   },
   {
@@ -272,15 +258,7 @@ const experiences = [
     icon: Palette,
     component: ColorHarmonyExperience,
     color: 'from-blue-500/20 to-cyan-500/20',
-  },
-  {
-    id: 'reaction',
-    title: 'Reaction Test',
-    description: 'How fast are your reflexes?',
-    icon: Target,
-    component: ReactionTimeExperience,
-    color: 'from-green-500/20 to-emerald-500/20',
-  },
+  }
 ];
 
 export function PlaygroundSection() {
@@ -307,13 +285,13 @@ export function PlaygroundSection() {
             Play with <span className="text-gradient">code</span>
           </h2>
           <p className="text-white/60 text-lg max-w-2xl mx-auto">
-            Four interactive experiences that showcase the playful side of creative technology. 
+            Four interactive experiences that showcase the playful side of creative technology.
             Click any card to dive in.
           </p>
         </motion.div>
 
         {/* Experience Grid */}
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {experiences.map((exp, index) => {
             const Icon = exp.icon;
             const Component = exp.component;
@@ -337,7 +315,7 @@ export function PlaygroundSection() {
                   'absolute inset-0 bg-gradient-to-br opacity-50',
                   exp.color
                 )} />
-                
+
                 {/* Glass Overlay */}
                 <div className="absolute inset-0 glass" />
 

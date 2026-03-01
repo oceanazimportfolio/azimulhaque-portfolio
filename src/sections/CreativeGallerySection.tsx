@@ -38,16 +38,16 @@ const fourMarfelousImages: GalleryImage[] = [
 ];
 
 // Image Lightbox Component
-function ImageLightbox({ 
-  isOpen, 
-  onClose, 
-  images, 
+function ImageLightbox({
+  isOpen,
+  onClose,
+  images,
   currentIndex,
-  onNavigate 
-}: { 
-  isOpen: boolean; 
-  onClose: () => void; 
-  images: GalleryImage[]; 
+  onNavigate
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  images: GalleryImage[];
   currentIndex: number;
   onNavigate: (index: number) => void;
 }) {
@@ -155,10 +155,13 @@ export function CreativeGallerySection() {
   const [selectedImage, setSelectedImage] = useState<number | null>(null);
   const [filter, setFilter] = useState<'all' | 'photo-manipulation'>('all');
   const [showYouTubePopup, setShowYouTubePopup] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
-  const filteredImages = filter === 'all' 
-    ? fourMarfelousImages 
+  const filteredImages = filter === 'all'
+    ? fourMarfelousImages
     : fourMarfelousImages.filter(img => img.category === filter);
+
+  const displayedImages = showAll ? filteredImages : filteredImages.slice(0, 8);
 
   return (
     <section id="creative" className="relative min-h-screen py-20 md:py-32">
@@ -178,7 +181,7 @@ export function CreativeGallerySection() {
             Four <span className="text-gradient">Marfelous</span>
           </h2>
           <p className="text-white/60 text-lg max-w-2xl mx-auto mb-8">
-            A creative journey through photo manipulation, motion graphics, and visual storytelling. 
+            A creative journey through photo manipulation, motion graphics, and visual storytelling.
             Explore magical worlds, portals, and imaginative compositions.
           </p>
 
@@ -255,7 +258,7 @@ export function CreativeGallerySection() {
           className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4"
         >
           <AnimatePresence>
-            {filteredImages.map((image, index) => (
+            {displayedImages.map((image, index) => (
               <motion.div
                 key={image.src}
                 layout
@@ -280,6 +283,22 @@ export function CreativeGallerySection() {
             ))}
           </AnimatePresence>
         </motion.div>
+
+        {/* Show More Button */}
+        {filteredImages.length > 8 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mt-12 flex justify-center"
+          >
+            <button
+              onClick={() => setShowAll(!showAll)}
+              className="px-8 py-3 glass rounded-full text-sm font-medium hover:bg-white/10 transition-colors flex items-center gap-2"
+            >
+              {showAll ? 'Show Less' : 'View Full Gallery'}
+            </button>
+          </motion.div>
+        )}
 
         {/* YouTube CTA */}
         <motion.div
@@ -312,9 +331,9 @@ export function CreativeGallerySection() {
       )}
 
       {/* YouTube Popup */}
-      <YouTubePopup 
-        isOpen={showYouTubePopup} 
-        onClose={() => setShowYouTubePopup(false)} 
+      <YouTubePopup
+        isOpen={showYouTubePopup}
+        onClose={() => setShowYouTubePopup(false)}
       />
     </section>
   );

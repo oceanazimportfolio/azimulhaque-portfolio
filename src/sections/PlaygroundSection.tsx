@@ -371,12 +371,12 @@ export function PlaygroundSection() {
           <p className="text-white/40 mb-4">
             Want to see more interactive experiments?
           </p>
-          <a
-            href="#contact"
+          <button
+            onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
             className="px-6 py-3 glass rounded-full text-sm font-medium hover:bg-white/10 transition-colors inline-block"
           >
             Let's collaborate
-          </a>
+          </button>
         </motion.div>
       </div>
     </section>

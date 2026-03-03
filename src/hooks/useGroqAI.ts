@@ -2,7 +2,10 @@ import { useState, useCallback } from 'react';
 import type { ChatMessage } from '@/types';
 
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+// Use Vite proxy in development, and corsproxy in production to bypass Groq CORS restrictions
+const GROQ_API_URL = import.meta.env.DEV
+  ? '/api/groq/openai/v1/chat/completions'
+  : 'https://corsproxy.io/?' + encodeURIComponent('https://api.groq.com/openai/v1/chat/completions');
 
 const SYSTEM_PROMPT = `You are an AI recruiter assistant for Azimul Haque's portfolio. Your role is to:
 
@@ -119,6 +122,7 @@ export function useGroqAI() {
 
       setMessages((prev) => [...prev, aiMessage]);
     } catch (err) {
+      console.error("Groq API Error:", err);
       setError(err instanceof Error ? err.message : 'An error occurred');
       // Add fallback response
       const fallbackMessage: ChatMessage = {

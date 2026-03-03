@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { ChatMessage } from '@/types';
 
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+const GROQ_API_KEY = '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';
 // Use Vite proxy in development, and corsproxy in production to bypass Groq CORS restrictions
 const GROQ_API_URL = import.meta.env.DEV
   ? '/api/groq/openai/v1/chat/completions'

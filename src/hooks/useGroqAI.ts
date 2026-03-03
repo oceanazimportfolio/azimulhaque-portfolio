@@ -1,11 +1,13 @@
 import { useState, useCallback } from 'react';
 import type { ChatMessage } from '@/types';
 
-const GROQ_API_KEY = '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';
-// Use Vite proxy in development, and corsproxy in production to bypass Groq CORS restrictions
-const GROQ_API_URL = import.meta.env.DEV
-  ? '/api/groq/openai/v1/chat/completions'
-  : 'https://corsproxy.io/?' + encodeURIComponent('https://api.groq.com/openai/v1/chat/completions');
+const GROQ_API_KEYS = [
+  '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',
+  // You can add a second API key string here later!
+  // 'YOUR_SECOND_API_KEY_HERE',
+];
+
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 const SYSTEM_PROMPT = `You are an AI recruiter assistant for Azimul Haque's portfolio. Your role is to:
 
@@ -87,44 +89,69 @@ export function useGroqAI() {
     setIsLoading(true);
     setError(null);
 
-    try {
-      const response = await fetch(GROQ_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${GROQ_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            ...messages.map((m) => ({ role: m.role, content: m.content })),
-            { role: 'user', content },
-          ],
-          temperature: 0.7,
-          max_tokens: 200,
-        }),
-      });
+    let apiSuccess = false;
+    let fallbackError: string | null = null;
 
-      if (!response.ok) {
-        throw new Error('Failed to get response from AI');
+    // Try each key sequentially
+    for (const apiKey of GROQ_API_KEYS) {
+      if (!apiKey || apiKey.trim() === '') continue; // Skip empty fallback slots
+
+      try {
+        console.log("Attempting Groq API Request with a key...");
+
+        const response = await fetch(GROQ_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [
+              { role: 'system', content: SYSTEM_PROMPT },
+              ...messages.map((m) => ({ role: m.role, content: m.content })),
+              { role: 'user', content },
+            ],
+            temperature: 0.7,
+            max_tokens: 200,
+          }),
+        });
+
+        console.log("Groq API Response Status:", response.status, response.ok);
+
+        if (!response.ok) {
+          // If it's a 4xx client or rate limit error, throw error so catch block will try next key 
+          // 401 is unauthorized/invalid key, 429 is rate limit / free tier limit reached
+          const errorBody = await response.text();
+          console.log("Error body:", errorBody);
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const aiContent = data.choices[0]?.message?.content || 'I apologize, but I could not process your request.';
+
+        const aiMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: aiContent,
+          timestamp: new Date(),
+        };
+
+        setMessages((prev) => [...prev, aiMessage]);
+        apiSuccess = true;
+        break; // Stop looking for another key - we succeeded!
+
+      } catch (err) {
+        console.error("Groq API Error on this key:", err);
+        fallbackError = err instanceof Error ? err.message : 'An error occurred';
+        // Continue loop to try next API key...
       }
+    }
 
-      const data = await response.json();
-      const aiContent = data.choices[0]?.message?.content || 'I apologize, but I could not process your request.';
+    if (!apiSuccess) {
+      console.error("All Groq API keys failed.");
+      setError(fallbackError);
 
-      const aiMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: aiContent,
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, aiMessage]);
-    } catch (err) {
-      console.error("Groq API Error:", err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      // Add fallback response
       const fallbackMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -132,9 +159,9 @@ export function useGroqAI() {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, fallbackMessage]);
-    } finally {
-      setIsLoading(false);
     }
+
+    setIsLoading(false);
   }, [messages]);
 
   const clearMessages = useCallback(() => {

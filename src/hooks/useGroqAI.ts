@@ -1,13 +1,13 @@
 import { useState, useCallback } from 'react';
 import type { ChatMessage } from '@/types';
 
-const GROQ_API_KEYS = [
+// Array of API Keys. The system will try them in order.
+// Supports both Groq keys (gsk_...) and Google Gemini keys (AIza...)
+const API_KEYS = [
   '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',
-  // You can add a second API key string here later!
-  // 'YOUR_SECOND_API_KEY_HERE',
+  // Google API key as secondary fallback
+  'AIzaSyA7F1eikJu98RNJN8W16pKVO7CEGnVdqoU'
 ];
-
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 const SYSTEM_PROMPT = `You are an AI recruiter assistant for Azimul Haque's portfolio. Your role is to:
 
@@ -93,19 +93,57 @@ export function useGroqAI() {
     let fallbackError: string | null = null;
 
     // Try each key sequentially
-    for (const apiKey of GROQ_API_KEYS) {
-      if (!apiKey || apiKey.trim() === '') continue; // Skip empty fallback slots
+    for (const apiKey of API_KEYS) {
+      if (!apiKey || apiKey.trim() === '') continue;
 
       try {
-        console.log("Attempting Groq API Request with a key...");
+        console.log("Attempting API Request with key...", apiKey.substring(0, 8) + "...");
 
-        const response = await fetch(GROQ_API_URL, {
-          method: 'POST',
-          headers: {
+        let targetUrl = '';
+        let headers: Record<string, string> = {};
+        let bodyPayload = {};
+
+        // Check if this is a Google Gemini key or a Groq key to format the request correctly
+        const isGoogleKey = apiKey.startsWith('AIza');
+
+        if (isGoogleKey) {
+          // Format for Google Gemini API
+          targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+          headers = {
+            'Content-Type': 'application/json',
+          };
+
+          // Format conversation history for Gemini
+          const geminiContents = messages.map(m => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content }]
+          }));
+
+          // Add the new user message
+          geminiContents.push({
+            role: 'user',
+            parts: [{ text: content }]
+          });
+
+          bodyPayload = {
+            system_instruction: {
+              parts: [{ text: SYSTEM_PROMPT }]
+            },
+            contents: geminiContents,
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 200,
+            }
+          };
+        } else {
+          // Format for Groq API
+          targetUrl = 'https://api.groq.com/openai/v1/chat/completions';
+          headers = {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
+          };
+
+          bodyPayload = {
             model: 'llama-3.3-70b-versatile',
             messages: [
               { role: 'system', content: SYSTEM_PROMPT },
@@ -114,21 +152,32 @@ export function useGroqAI() {
             ],
             temperature: 0.7,
             max_tokens: 200,
-          }),
+          };
+        }
+
+        const response = await fetch(targetUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(bodyPayload),
         });
 
-        console.log("Groq API Response Status:", response.status, response.ok);
+        console.log(`${isGoogleKey ? 'Google' : 'Groq'} API Response Status:`, response.status, response.ok);
 
         if (!response.ok) {
-          // If it's a 4xx client or rate limit error, throw error so catch block will try next key 
-          // 401 is unauthorized/invalid key, 429 is rate limit / free tier limit reached
           const errorBody = await response.text();
           console.log("Error body:", errorBody);
           throw new Error(`HTTP ${response.status}`);
         }
 
         const data = await response.json();
-        const aiContent = data.choices[0]?.message?.content || 'I apologize, but I could not process your request.';
+
+        // Extract content based on which API we successfully called
+        let aiContent = '';
+        if (isGoogleKey) {
+          aiContent = data.candidates?.[0]?.content?.parts?.[0]?.text || 'I apologize, but I could not process your request.';
+        } else {
+          aiContent = data.choices?.[0]?.message?.content || 'I apologize, but I could not process your request.';
+        }
 
         const aiMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
@@ -142,14 +191,14 @@ export function useGroqAI() {
         break; // Stop looking for another key - we succeeded!
 
       } catch (err) {
-        console.error("Groq API Error on this key:", err);
+        console.error("API Error on this key:", err);
         fallbackError = err instanceof Error ? err.message : 'An error occurred';
         // Continue loop to try next API key...
       }
     }
 
     if (!apiSuccess) {
-      console.error("All Groq API keys failed.");
+      console.error("All API keys failed.");
       setError(fallbackError);
 
       const fallbackMessage: ChatMessage = {

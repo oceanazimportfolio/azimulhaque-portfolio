@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
 import type { ChatMessage } from '@/types';
 
-// Load API key from environment, fallback to the provided key
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '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';
+const GROQ_API_KEY = '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';
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 const SYSTEM_PROMPT = `You are an AI recruiter assistant for Azimul Haque's portfolio. Your role is to:
 
@@ -60,15 +60,15 @@ Respond concisely (2-3 sentences max) and guide users toward relevant sections.
 If someone describes a job or project, analyze requirements and suggest relevant skills.
 Always maintain a helpful, professional tone.`;
 
-const WELCOME_MESSAGE: ChatMessage = {
-  id: 'welcome',
-  role: 'assistant',
-  content: "Hi! I'm Azimul's AI assistant. What brings you here today? Looking for a UI/UX designer, exploring projects, or have a specific role in mind? I'm here to help!",
-  timestamp: new Date(),
-};
-
 export function useGroqAI() {
-  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      content: "Hi! I'm Azimul's AI assistant. What brings you here today? Looking for a UI/UX designer, exploring projects, or have a specific role in mind? I'm here to help!",
+      timestamp: new Date(),
+    },
+  ]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,48 +85,30 @@ export function useGroqAI() {
     setError(null);
 
     try {
-      console.log("Attempting Groq API Request...");
-
-      // In dev, use Vite proxy. In production, use Netlify serverless function to avoid CORS.
-      const isDevMode = import.meta.env.DEV;
-      const targetUrl = isDevMode
-        ? '/api/groq/openai/v1/chat/completions'
-        : '/.netlify/functions/chat';
-
-      const requestBody = {
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          ...messages.map((m) => ({ role: m.role, content: m.content })),
-          { role: 'user', content },
-        ],
-        temperature: 0.7,
-        max_tokens: 200,
-      };
-
-      // In dev, send the Authorization header directly (via Vite proxy).
-      // In production, the Netlify function handles the key server-side.
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (isDevMode) {
-        headers['Authorization'] = `Bearer ${GROQ_API_KEY}`;
-      }
-
-      const response = await fetch(targetUrl, {
+      const response = await fetch(GROQ_API_URL, {
         method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            ...messages.map((m) => ({ role: m.role, content: m.content })),
+            { role: 'user', content },
+          ],
+          temperature: 0.7,
+          max_tokens: 200,
+        }),
       });
 
-      console.log("Groq API Response Status:", response.status, response.ok);
-
       if (!response.ok) {
-        const errorBody = await response.text();
-        console.error("Error body:", errorBody);
-        throw new Error(`HTTP ${response.status}`);
+        throw new Error('Failed to get response from AI');
       }
 
       const data = await response.json();
-      const aiContent = data.choices?.[0]?.message?.content || 'I apologize, but I could not process your request.';
+      const aiContent = data.choices[0]?.message?.content || 'I apologize, but I could not process your request.';
 
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -136,15 +118,12 @@ export function useGroqAI() {
       };
 
       setMessages((prev) => [...prev, aiMessage]);
-
     } catch (err) {
-      console.error("API Error on this key:", err);
       setError(err instanceof Error ? err.message : 'An error occurred');
-
       const fallbackMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "I'm having a little trouble connecting right now, but I'm here to help! You can explore the Work section for projects or the Creative Gallery for visual work.",
+        content: "I'm here to help! You can explore the Work section for projects, the Creative Gallery for visual work, or tell me what you're looking for and I'll guide you to the right place.",
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, fallbackMessage]);
@@ -154,7 +133,14 @@ export function useGroqAI() {
   }, [messages]);
 
   const clearMessages = useCallback(() => {
-    setMessages([WELCOME_MESSAGE]);
+    setMessages([
+      {
+        id: 'welcome',
+        role: 'assistant',
+        content: "Hi! I'm Azimul's AI assistant. What brings you here today? Looking for a UI/UX designer, exploring projects, or have a specific role in mind? I'm here to help!",
+        timestamp: new Date(),
+      },
+    ]);
   }, []);
 
   return {

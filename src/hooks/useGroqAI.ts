@@ -87,27 +87,34 @@ export function useGroqAI() {
     try {
       console.log("Attempting Groq API Request...");
 
-      // Use Vite proxy in development to avoid CORS issues, otherwise use direct URL
-      const targetUrl = import.meta.env.DEV
+      // In dev, use Vite proxy. In production, use Netlify serverless function to avoid CORS.
+      const isDevMode = import.meta.env.DEV;
+      const targetUrl = isDevMode
         ? '/api/groq/openai/v1/chat/completions'
-        : 'https://api.groq.com/openai/v1/chat/completions';
+        : '/.netlify/functions/chat';
+
+      const requestBody = {
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          ...messages.map((m) => ({ role: m.role, content: m.content })),
+          { role: 'user', content },
+        ],
+        temperature: 0.7,
+        max_tokens: 200,
+      };
+
+      // In dev, send the Authorization header directly (via Vite proxy).
+      // In production, the Netlify function handles the key server-side.
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (isDevMode) {
+        headers['Authorization'] = `Bearer ${GROQ_API_KEY}`;
+      }
 
       const response = await fetch(targetUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${GROQ_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            ...messages.map((m) => ({ role: m.role, content: m.content })),
-            { role: 'user', content },
-          ],
-          temperature: 0.7,
-          max_tokens: 200,
-        }),
+        headers,
+        body: JSON.stringify(requestBody),
       });
 
       console.log("Groq API Response Status:", response.status, response.ok);

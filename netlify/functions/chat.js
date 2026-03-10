@@ -1,4 +1,17 @@
 export async function handler(event) {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+        return {
+            statusCode: 200,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            },
+            body: '',
+        };
+    }
+
     // Only allow POST
     if (event.httpMethod !== 'POST') {
         return {
@@ -10,8 +23,10 @@ export async function handler(event) {
     const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
     if (!GROQ_API_KEY) {
+        console.error('GROQ_API_KEY environment variable is not set!');
         return {
             statusCode: 500,
+            headers: { 'Access-Control-Allow-Origin': '*' },
             body: JSON.stringify({ error: 'Server configuration error: missing API key' }),
         };
     }
@@ -39,9 +54,12 @@ export async function handler(event) {
             body: JSON.stringify(data),
         };
     } catch (err) {
+        console.error('Groq API error:', err.message);
         return {
             statusCode: 500,
+            headers: { 'Access-Control-Allow-Origin': '*' },
             body: JSON.stringify({ error: err.message }),
         };
     }
 }
+

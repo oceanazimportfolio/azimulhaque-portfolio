@@ -1,7 +1,142 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Target, Palette, RefreshCw, MousePointerClick } from 'lucide-react';
+import { Target, Palette, RefreshCw, MousePointerClick, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+
+interface Score {
+  name: string;
+  country: string;
+  score: number;
+}
+
+import { getData } from 'country-list';
+
+// Returns the emoji flag for a given ISO 3166-1 alpha-2 code
+const getFlagEmoji = (countryCode: string) => {
+  const codePoints = countryCode
+    .toUpperCase()
+    .split('')
+    .map(char => 127397 + char.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+};
+
+const COUNTRIES = getData().map(c => ({
+  code: c.code,
+  name: c.name,
+  emoji: getFlagEmoji(c.code)
+})).sort((a, b) => a.name.localeCompare(b.name));
+
+const getTopScores = (gameId: string): Score[] => {
+  if (typeof window === 'undefined') return [];
+  const scores = localStorage.getItem(`scores_${gameId}`);
+  return scores ? JSON.parse(scores) : [];
+};
+
+const saveScore = (gameId: string, score: Score, ascending: boolean = false) => {
+  const scores = getTopScores(gameId);
+  scores.push(score);
+  scores.sort((a, b) => ascending ? a.score - b.score : b.score - a.score);
+  const top5 = scores.slice(0, 5);
+  localStorage.setItem(`scores_${gameId}`, JSON.stringify(top5));
+};
+
+const checkIsTopScore = (gameId: string, score: number, ascending: boolean = false): boolean => {
+  const scores = getTopScores(gameId);
+  if (scores.length < 5) return true;
+  const worstScore = scores[scores.length - 1].score;
+  return ascending ? score < worstScore : score > worstScore;
+};
+
+function Leaderboard({ gameId, ascending }: { gameId: string, ascending?: boolean }) {
+  const [scores, setScores] = useState<Score[]>([]);
+  useEffect(() => {
+    setScores(getTopScores(gameId));
+  }, [gameId]);
+
+  if (scores.length === 0) return null;
+
+  return (
+    <div className="mt-8 w-full max-w-sm mx-auto glass rounded-2xl p-4 border border-white/10 relative z-10">
+      <div className="flex items-center gap-2 mb-4 justify-center text-white">
+        <Trophy className="w-5 h-5 text-yellow-500" />
+        <h4 className="font-bold text-lg">Top 5 Leaders</h4>
+      </div>
+      <div className="space-y-2">
+        {scores.map((s, i) => (
+          <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/5 text-sm text-white">
+            <div className="flex items-center gap-3">
+              <span className="text-white/40 w-4 font-bold">{i + 1}.</span>
+              <span className="text-xl">{COUNTRIES.find(c => c.code === s.country)?.emoji || '🏳️'}</span>
+              <span className="font-medium truncate max-w-[120px]">{s.name}</span>
+            </div>
+            <span className="font-bold text-electric">
+              {ascending ? `${s.score}ms` : s.score}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ScoreEntryModal({ isOpen, onClose, onSubmit, score, unit }: { isOpen: boolean, onClose: () => void, onSubmit: (name: string, country: string) => void, score: number, unit: string }) {
+  const [name, setName] = useState('');
+  const [country, setCountry] = useState('US');
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md glass border-white/10 bg-black/80 text-white shadow-[0_0_40px_rgba(255,46,0,0.15)]">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+            <Trophy className="text-yellow-500" /> New High Score!
+          </DialogTitle>
+          <DialogDescription className="text-white/60">
+            You achieved a top 5 score of  <strong className="text-white">{score}{unit}</strong>! Enter your name to join the leaderboard.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-white/80">Your Name</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-electric"
+              placeholder="Enter your name"
+              maxLength={15}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-white/80">Country</label>
+            <select
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-white/20 bg-black/80 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-electric [&>option]:bg-zinc-900 border-none appearance-none"
+            >
+              {COUNTRIES.map(c => (
+                <option key={c.code} value={c.code}>
+                  {c.emoji} {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 mt-4">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-white/60 hover:text-white transition-colors">
+            Cancel
+          </button>
+          <button
+            disabled={!name.trim()}
+            onClick={() => { onSubmit(name.trim(), country); onClose(); }}
+            className="px-6 py-2 bg-electric text-white text-sm font-medium rounded-full hover:bg-electric/80 disabled:opacity-50 transition-colors"
+          >
+            Submit Score
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // Experience 1: Click Speed Test
 function ClickSpeedExperience() {
@@ -9,6 +144,8 @@ function ClickSpeedExperience() {
   const [timeLeft, setTimeLeft] = useState(5);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [leaderboardKey, setLeaderboardKey] = useState(0);
 
   const startGame = () => {
     setClicks(0);
@@ -29,21 +166,36 @@ function ClickSpeedExperience() {
     }, 1000);
   };
 
+  useEffect(() => {
+    if (isFinished && clicks > 0 && checkIsTopScore('clickspeed', clicks)) {
+      const timer = setTimeout(() => setShowModal(true), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isFinished, clicks]);
+
+  const handleScoreSubmit = (name: string, country: string) => {
+    saveScore('clickspeed', { name, country, score: clicks });
+    setLeaderboardKey(prev => prev + 1);
+  };
+
   return (
-    <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+    <div className="h-full flex flex-col items-center justify-center p-6 text-center overflow-y-auto min-h-full py-12 pt-[10rem] pb-24 relative no-scrollbar">
       {!isPlaying && !isFinished && (
-        <motion.button
-          initial={{ scale: 0.9 }}
-          animate={{ scale: 1 }}
-          onClick={startGame}
-          className="w-32 h-32 rounded-full bg-electric flex items-center justify-center text-white font-bold text-lg hover:scale-105 transition-transform"
-        >
-          START
-        </motion.button>
+        <>
+          <motion.button
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            onClick={startGame}
+            className="w-32 h-32 rounded-full bg-electric flex items-center justify-center text-white font-bold text-lg hover:scale-105 transition-transform shrink-0"
+          >
+            START
+          </motion.button>
+          <Leaderboard key={leaderboardKey} gameId="clickspeed" />
+        </>
       )}
 
       {isPlaying && (
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center shrink-0">
           <p className="text-xl font-bold text-white mb-6 bg-white/10 px-4 py-2 rounded-full">
             Time: {timeLeft}s
           </p>
@@ -62,22 +214,28 @@ function ClickSpeedExperience() {
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
+          className="flex flex-col items-center w-full"
         >
           <p className="text-5xl font-bold mb-2">{(clicks / 5).toFixed(1)} <span className="text-2xl text-white/50">CPS</span></p>
           <p className="text-white/50 mb-8">Total Clicks: {clicks}</p>
           <button
             onClick={startGame}
-            className="px-8 py-3 bg-white/10 rounded-full text-sm font-medium hover:bg-white/20 transition-colors"
+            className="px-8 py-3 bg-white/10 rounded-full text-sm font-medium hover:bg-white/20 transition-colors mb-4 shrink-0"
           >
             Try Again
           </button>
+          <Leaderboard key={leaderboardKey} gameId="clickspeed" />
         </motion.div>
       )}
 
       {(!isPlaying || isFinished) && (
-        <p className="absolute bottom-4 text-white/40 text-sm text-center">
-          Test your clicking speed (clicks per second)
-        </p>
+        <ScoreEntryModal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          onSubmit={handleScoreSubmit}
+          score={clicks}
+          unit=" clicks"
+        />
       )}
     </div>
   );
@@ -153,6 +311,8 @@ function ReactionTimeExperience() {
   const [reactionTime, setReactionTime] = useState(0);
   const [bestTime, setBestTime] = useState<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [leaderboardKey, setLeaderboardKey] = useState(0);
 
   const startGame = () => {
     setState('waiting');
@@ -173,6 +333,10 @@ function ReactionTimeExperience() {
       setReactionTime(time);
       if (!bestTime || time < bestTime) setBestTime(time);
       setState('result');
+
+      if (checkIsTopScore('reaction', time, true)) {
+        setShowModal(true);
+      }
     }
   };
 
@@ -181,17 +345,25 @@ function ReactionTimeExperience() {
     setReactionTime(0);
   };
 
+  const handleScoreSubmit = (name: string, country: string) => {
+    saveScore('reaction', { name, country, score: reactionTime }, true);
+    setLeaderboardKey(prev => prev + 1);
+  };
+
   return (
-    <div className="h-full flex flex-col items-center justify-center p-6">
+    <div className="h-full flex flex-col items-center justify-center p-6 text-center overflow-y-auto min-h-full py-12 pt-[10rem] pb-24 relative no-scrollbar">
       {state === 'idle' && (
-        <motion.button
-          initial={{ scale: 0.9 }}
-          animate={{ scale: 1 }}
-          onClick={startGame}
-          className="w-32 h-32 rounded-full bg-electric flex items-center justify-center text-white font-bold text-lg hover:scale-105 transition-transform"
-        >
-          START
-        </motion.button>
+        <>
+          <motion.button
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            onClick={startGame}
+            className="w-32 h-32 rounded-full bg-electric flex items-center justify-center text-white font-bold text-lg hover:scale-105 transition-transform shrink-0"
+          >
+            START
+          </motion.button>
+          <Leaderboard key={leaderboardKey} gameId="reaction" ascending />
+        </>
       )}
 
       {(state === 'waiting' || state === 'ready') && (
@@ -200,7 +372,7 @@ function ReactionTimeExperience() {
           animate={{ scale: 1 }}
           onClick={handleClick}
           className={cn(
-            'w-40 h-40 rounded-full flex items-center justify-center text-white font-bold text-xl transition-colors',
+            'w-40 h-40 rounded-full flex items-center justify-center text-white font-bold text-xl transition-colors shrink-0',
             state === 'waiting' ? 'bg-red-500' : 'bg-green-500'
           )}
         >
@@ -212,7 +384,7 @@ function ReactionTimeExperience() {
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          className="text-center"
+          className="text-center flex flex-col items-center w-full"
         >
           <p className="text-4xl font-bold mb-2">{reactionTime}ms</p>
           {bestTime && (
@@ -220,16 +392,21 @@ function ReactionTimeExperience() {
           )}
           <button
             onClick={reset}
-            className="px-6 py-2 bg-white/10 rounded-full text-sm hover:bg-white/20 transition-colors"
+            className="px-6 py-2 bg-white/10 rounded-full text-sm hover:bg-white/20 transition-colors mb-4 shrink-0"
           >
             Try Again
           </button>
+          <Leaderboard key={leaderboardKey} gameId="reaction" ascending />
         </motion.div>
       )}
 
-      <p className="absolute bottom-4 text-white/40 text-sm text-center">
-        Test your reaction speed
-      </p>
+      <ScoreEntryModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onSubmit={handleScoreSubmit}
+        score={reactionTime}
+        unit="ms"
+      />
     </div>
   );
 }
@@ -285,7 +462,7 @@ export function PlaygroundSection() {
             Play with <span className="text-gradient">code</span>
           </h2>
           <p className="text-white/60 text-lg max-w-2xl mx-auto">
-            Four interactive experiences that showcase the playful side of creative technology.
+            Three interactive experiences that showcase the playful side of creative technology.
             Click any card to dive in.
           </p>
         </motion.div>

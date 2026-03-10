@@ -23,6 +23,12 @@ export default defineConfig({
           'Origin': 'https://api.groq.com',
           'Referer': 'https://api.groq.com'
         }
+      },
+      '/api/scores': {
+        target: 'http://localhost:8888/.netlify/functions/scores',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api\/scores/, ''),
       }
     }
   }

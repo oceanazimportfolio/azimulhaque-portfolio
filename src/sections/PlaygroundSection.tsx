@@ -27,32 +27,67 @@ const COUNTRIES = getData().map(c => ({
   emoji: getFlagEmoji(c.code)
 })).sort((a, b) => a.name.localeCompare(b.name));
 
-const getTopScores = (gameId: string): Score[] => {
-  if (typeof window === 'undefined') return [];
-  const scores = localStorage.getItem(`scores_${gameId}`);
-  return scores ? JSON.parse(scores) : [];
+const getTopScores = async (gameId: string): Promise<Score[]> => {
+  try {
+    const response = await fetch('/api/scores');
+    if (!response.ok) throw new Error('Fetch failed');
+    const data = await response.json();
+    return data[gameId] || [];
+  } catch (err) {
+    console.error('Error fetching scores:', err);
+    return [];
+  }
 };
 
-const saveScore = (gameId: string, score: Score, ascending: boolean = false) => {
-  const scores = getTopScores(gameId);
-  scores.push(score);
-  scores.sort((a, b) => ascending ? a.score - b.score : b.score - a.score);
-  const top5 = scores.slice(0, 5);
-  localStorage.setItem(`scores_${gameId}`, JSON.stringify(top5));
+const saveScore = async (gameId: string, score: Score, ascending: boolean = false) => {
+  try {
+    // 1. Get latest scores first
+    const response = await fetch('/api/scores');
+    const allScores = await response.json();
+    const gameScores = allScores[gameId] || [];
+
+    // 2. Add new score and sort
+    gameScores.push(score);
+    gameScores.sort((a: Score, b: Score) => ascending ? a.score - b.score : b.score - a.score);
+
+    // 3. Keep top 5 and upload
+    allScores[gameId] = gameScores.slice(0, 5);
+
+    await fetch('/api/scores', {
+      method: 'POST',
+      body: JSON.stringify(allScores)
+    });
+  } catch (err) {
+    console.error('Error saving score:', err);
+  }
 };
 
-const checkIsTopScore = (gameId: string, score: number, ascending: boolean = false): boolean => {
-  const scores = getTopScores(gameId);
-  if (scores.length < 5) return true;
-  const worstScore = scores[scores.length - 1].score;
+const checkIsTopScore = (existingScores: Score[], score: number, ascending: boolean = false): boolean => {
+  if (existingScores.length < 5) return true;
+  const worstScore = existingScores[existingScores.length - 1].score;
   return ascending ? score < worstScore : score > worstScore;
 };
 
-function Leaderboard({ gameId, ascending }: { gameId: string, ascending?: boolean }) {
+function Leaderboard({ gameId, ascending, refreshKey }: { gameId: string, ascending?: boolean, refreshKey?: number }) {
   const [scores, setScores] = useState<Score[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    setScores(getTopScores(gameId));
-  }, [gameId]);
+    let mounted = true;
+    getTopScores(gameId).then(data => {
+      if (mounted) {
+        setScores(data);
+        setLoading(false);
+      }
+    });
+    return () => { mounted = false; };
+  }, [gameId, refreshKey]);
+
+  if (loading) return (
+    <div className="mt-8 w-full max-w-sm mx-auto glass rounded-2xl p-8 border border-white/10 flex items-center justify-center">
+      <div className="w-6 h-6 border-2 border-electric border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   if (scores.length === 0) return null;
 
@@ -60,7 +95,7 @@ function Leaderboard({ gameId, ascending }: { gameId: string, ascending?: boolea
     <div className="mt-8 w-full max-w-sm mx-auto glass rounded-2xl p-4 border border-white/10 relative z-10">
       <div className="flex items-center gap-2 mb-4 justify-center text-white">
         <Trophy className="w-5 h-5 text-yellow-500" />
-        <h4 className="font-bold text-lg">Top 5 Leaders</h4>
+        <h4 className="font-bold text-lg">Global Top 5</h4>
       </div>
       <div className="space-y-2">
         {scores.map((s, i) => (
@@ -167,14 +202,18 @@ function ClickSpeedExperience() {
   };
 
   useEffect(() => {
-    if (isFinished && clicks > 0 && checkIsTopScore('clickspeed', clicks)) {
-      const timer = setTimeout(() => setShowModal(true), 500);
-      return () => clearTimeout(timer);
+    if (isFinished && clicks > 0) {
+      getTopScores('clickspeed').then(scores => {
+        if (checkIsTopScore(scores, clicks)) {
+          const timer = setTimeout(() => setShowModal(true), 500);
+          return () => clearTimeout(timer);
+        }
+      });
     }
   }, [isFinished, clicks]);
 
-  const handleScoreSubmit = (name: string, country: string) => {
-    saveScore('clickspeed', { name, country, score: clicks });
+  const handleScoreSubmit = async (name: string, country: string) => {
+    await saveScore('clickspeed', { name, country, score: clicks });
     setLeaderboardKey(prev => prev + 1);
   };
 
@@ -190,7 +229,7 @@ function ClickSpeedExperience() {
           >
             START
           </motion.button>
-          <Leaderboard key={leaderboardKey} gameId="clickspeed" />
+          <Leaderboard refreshKey={leaderboardKey} gameId="clickspeed" />
         </>
       )}
 
@@ -224,7 +263,7 @@ function ClickSpeedExperience() {
           >
             Try Again
           </button>
-          <Leaderboard key={leaderboardKey} gameId="clickspeed" />
+          <Leaderboard refreshKey={leaderboardKey} gameId="clickspeed" />
         </motion.div>
       )}
 
@@ -323,7 +362,7 @@ function ReactionTimeExperience() {
     }, delay);
   };
 
-  const handleClick = () => {
+  const handleClick = async () => {
     if (state === 'waiting') {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       setState('idle');
@@ -334,7 +373,8 @@ function ReactionTimeExperience() {
       if (!bestTime || time < bestTime) setBestTime(time);
       setState('result');
 
-      if (checkIsTopScore('reaction', time, true)) {
+      const scores = await getTopScores('reaction');
+      if (checkIsTopScore(scores, time, true)) {
         setShowModal(true);
       }
     }
@@ -345,8 +385,8 @@ function ReactionTimeExperience() {
     setReactionTime(0);
   };
 
-  const handleScoreSubmit = (name: string, country: string) => {
-    saveScore('reaction', { name, country, score: reactionTime }, true);
+  const handleScoreSubmit = async (name: string, country: string) => {
+    await saveScore('reaction', { name, country, score: reactionTime }, true);
     setLeaderboardKey(prev => prev + 1);
   };
 
@@ -362,7 +402,7 @@ function ReactionTimeExperience() {
           >
             START
           </motion.button>
-          <Leaderboard key={leaderboardKey} gameId="reaction" ascending />
+          <Leaderboard refreshKey={leaderboardKey} gameId="reaction" ascending />
         </>
       )}
 
@@ -396,7 +436,7 @@ function ReactionTimeExperience() {
           >
             Try Again
           </button>
-          <Leaderboard key={leaderboardKey} gameId="reaction" ascending />
+          <Leaderboard refreshKey={leaderboardKey} gameId="reaction" ascending />
         </motion.div>
       )}
 

@@ -1,8 +1,33 @@
 import { useState, useCallback } from 'react';
 import type { ChatMessage } from '@/types';
 
-const GROQ_API_KEY = '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';
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const AI_ENDPOINTS = ['/api/chat', '/.netlify/functions/chat'];
+
+async function requestAI(body: unknown) {
+  let lastError: unknown = null;
+
+  for (const endpoint of AI_ENDPOINTS) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        throw new Error(`AI request failed (${response.status}) at ${endpoint}`);
+      }
+
+      return await response.json();
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError ?? new Error('AI service unavailable');
+}
 
 const SYSTEM_PROMPT = `You are an AI recruiter assistant for Azimul Haque's portfolio. Your role is to:
 
@@ -85,29 +110,17 @@ export function useGroqAI() {
     setError(null);
 
     try {
-      const response = await fetch(GROQ_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${GROQ_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            ...messages.map((m) => ({ role: m.role, content: m.content })),
-            { role: 'user', content },
-          ],
-          temperature: 0.7,
-          max_tokens: 200,
-        }),
+      const data = await requestAI({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          ...messages.map((m) => ({ role: m.role, content: m.content })),
+          { role: 'user', content },
+        ],
+        temperature: 0.7,
+        max_tokens: 200,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to get response from AI');
-      }
-
-      const data = await response.json();
       const aiContent = data.choices[0]?.message?.content || 'I apologize, but I could not process your request.';
 
       const aiMessage: ChatMessage = {

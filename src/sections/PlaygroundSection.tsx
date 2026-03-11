@@ -10,6 +10,10 @@ interface Score {
   score: number;
 }
 
+interface ScoresByGame {
+  [gameId: string]: Score[];
+}
+
 import { getData } from 'country-list';
 
 // Returns the emoji flag for a given ISO 3166-1 alpha-2 code
@@ -27,39 +31,52 @@ const COUNTRIES = getData().map(c => ({
   emoji: getFlagEmoji(c.code)
 })).sort((a, b) => a.name.localeCompare(b.name));
 
-const getTopScores = async (gameId: string): Promise<Score[]> => {
-  try {
-    const response = await fetch('/api/scores');
-    if (!response.ok) throw new Error('Fetch failed');
-    const data = await response.json();
-    return data[gameId] || [];
-  } catch (err) {
-    console.error('Error fetching scores:', err);
-    return [];
+const SCORE_ENDPOINTS = ['/api/scores', '/.netlify/functions/scores'];
+
+const requestScoresApi = async (method: 'GET' | 'POST', body?: ScoresByGame): Promise<ScoresByGame> => {
+  let lastError: unknown = null;
+
+  for (const endpoint of SCORE_ENDPOINTS) {
+    try {
+      const response = await fetch(endpoint, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed (${response.status}) at ${endpoint}`);
+      }
+
+      return await response.json();
+    } catch (err) {
+      lastError = err;
+    }
   }
+
+  throw lastError ?? new Error('Score service unavailable');
+};
+
+const getTopScores = async (gameId: string): Promise<Score[]> => {
+  const data = await requestScoresApi('GET');
+  return data[gameId] || [];
 };
 
 const saveScore = async (gameId: string, score: Score, ascending: boolean = false) => {
-  try {
-    // 1. Get latest scores first
-    const response = await fetch('/api/scores');
-    const allScores = await response.json();
-    const gameScores = allScores[gameId] || [];
+  // 1. Get latest scores first
+  const allScores = await requestScoresApi('GET');
+  const gameScores = allScores[gameId] || [];
 
-    // 2. Add new score and sort
-    gameScores.push(score);
-    gameScores.sort((a: Score, b: Score) => ascending ? a.score - b.score : b.score - a.score);
+  // 2. Add new score and sort
+  gameScores.push(score);
+  gameScores.sort((a: Score, b: Score) => ascending ? a.score - b.score : b.score - a.score);
 
-    // 3. Keep top 5 and upload
-    allScores[gameId] = gameScores.slice(0, 5);
+  // 3. Keep top 5 and upload
+  allScores[gameId] = gameScores.slice(0, 5);
 
-    await fetch('/api/scores', {
-      method: 'POST',
-      body: JSON.stringify(allScores)
-    });
-  } catch (err) {
-    console.error('Error saving score:', err);
-  }
+  await requestScoresApi('POST', allScores);
 };
 
 const checkIsTopScore = (existingScores: Score[], score: number, ascending: boolean = false): boolean => {
@@ -71,15 +88,31 @@ const checkIsTopScore = (existingScores: Score[], score: number, ascending: bool
 function Leaderboard({ gameId, ascending, refreshKey }: { gameId: string, ascending?: boolean, refreshKey?: number }) {
   const [scores, setScores] = useState<Score[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
-    getTopScores(gameId).then(data => {
-      if (mounted) {
-        setScores(data);
-        setLoading(false);
-      }
-    });
+    setLoading(true);
+    setError(null);
+
+    getTopScores(gameId)
+      .then(data => {
+        if (mounted) {
+          setScores(data);
+        }
+      })
+      .catch(err => {
+        if (mounted) {
+          setError(err instanceof Error ? err.message : 'Unable to load scores');
+          setScores([]);
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoading(false);
+        }
+      });
+
     return () => { mounted = false; };
   }, [gameId, refreshKey]);
 
@@ -89,33 +122,41 @@ function Leaderboard({ gameId, ascending, refreshKey }: { gameId: string, ascend
     </div>
   );
 
-  if (scores.length === 0) return null;
-
   return (
     <div className="mt-8 w-full max-w-sm mx-auto glass rounded-2xl p-4 border border-white/10 relative z-10">
       <div className="flex items-center gap-2 mb-4 justify-center text-white">
         <Trophy className="w-5 h-5 text-yellow-500" />
         <h4 className="font-bold text-lg">Global Top 5</h4>
       </div>
-      <div className="space-y-2">
-        {scores.map((s, i) => (
-          <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/5 text-sm text-white">
-            <div className="flex items-center gap-3">
-              <span className="text-white/40 w-4 font-bold">{i + 1}.</span>
-              <span className="text-xl">{COUNTRIES.find(c => c.code === s.country)?.emoji || '🏳️'}</span>
-              <span className="font-medium truncate max-w-[120px]">{s.name}</span>
+      {error ? (
+        <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">
+          Scoreboard is temporarily unavailable.
+        </div>
+      ) : scores.length === 0 ? (
+        <div className="rounded-lg bg-white/5 p-4 text-sm text-white/60 text-center">
+          No scores yet. Be the first to set a global record.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {scores.map((s, i) => (
+            <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/5 text-sm text-white">
+              <div className="flex items-center gap-3">
+                <span className="text-white/40 w-4 font-bold">{i + 1}.</span>
+                <span className="text-xl">{COUNTRIES.find(c => c.code === s.country)?.emoji || '🏳️'}</span>
+                <span className="font-medium truncate max-w-[120px]">{s.name}</span>
+              </div>
+              <span className="font-bold text-electric">
+                {ascending ? `${s.score}ms` : s.score}
+              </span>
             </div>
-            <span className="font-bold text-electric">
-              {ascending ? `${s.score}ms` : s.score}
-            </span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function ScoreEntryModal({ isOpen, onClose, onSubmit, score, unit }: { isOpen: boolean, onClose: () => void, onSubmit: (name: string, country: string) => void, score: number, unit: string }) {
+function ScoreEntryModal({ isOpen, onClose, onSubmit, score, unit, rankMessage }: { isOpen: boolean, onClose: () => void, onSubmit: (name: string, country: string) => void, score: number, unit: string, rankMessage?: string }) {
   const [name, setName] = useState('');
   const [country, setCountry] = useState('US');
 
@@ -129,6 +170,7 @@ function ScoreEntryModal({ isOpen, onClose, onSubmit, score, unit }: { isOpen: b
           <DialogDescription className="text-white/60">
             You achieved a top 5 score of  <strong className="text-white">{score}{unit}</strong>! Enter your name to join the leaderboard.
           </DialogDescription>
+          {rankMessage && <p className="text-sm text-electric font-medium mt-2">{rankMessage}</p>}
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
@@ -181,12 +223,14 @@ function ClickSpeedExperience() {
   const [isFinished, setIsFinished] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [leaderboardKey, setLeaderboardKey] = useState(0);
+  const [rankMessage, setRankMessage] = useState('');
 
   const startGame = () => {
     setClicks(0);
     setTimeLeft(5);
     setIsPlaying(true);
     setIsFinished(false);
+    setRankMessage('');
 
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
@@ -203,12 +247,19 @@ function ClickSpeedExperience() {
 
   useEffect(() => {
     if (isFinished && clicks > 0) {
-      getTopScores('clickspeed').then(scores => {
-        if (checkIsTopScore(scores, clicks)) {
-          const timer = setTimeout(() => setShowModal(true), 500);
-          return () => clearTimeout(timer);
-        }
-      });
+      getTopScores('clickspeed')
+        .then(scores => {
+          if (checkIsTopScore(scores, clicks)) {
+            const ranked = [...scores, { name: 'You', country: 'US', score: clicks }]
+              .sort((a, b) => b.score - a.score)
+              .slice(0, 5);
+            const rank = ranked.findIndex((s) => s.name === 'You' && s.score === clicks) + 1;
+            const beatCount = Math.max(0, scores.length - rank + 1);
+            setRankMessage(`You're ranked #${rank}! You beat ${beatCount} ${beatCount === 1 ? 'player' : 'players'}.`);
+            setTimeout(() => setShowModal(true), 500);
+          }
+        })
+        .catch((err) => console.error('Failed to evaluate score ranking:', err));
     }
   }, [isFinished, clicks]);
 
@@ -274,6 +325,7 @@ function ClickSpeedExperience() {
           onSubmit={handleScoreSubmit}
           score={clicks}
           unit=" clicks"
+          rankMessage={rankMessage}
         />
       )}
     </div>
@@ -352,9 +404,11 @@ function ReactionTimeExperience() {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [leaderboardKey, setLeaderboardKey] = useState(0);
+  const [rankMessage, setRankMessage] = useState('');
 
   const startGame = () => {
     setState('waiting');
+    setRankMessage('');
     const delay = Math.random() * 2000 + 1500;
     timeoutRef.current = setTimeout(() => {
       setState('ready');
@@ -373,9 +427,19 @@ function ReactionTimeExperience() {
       if (!bestTime || time < bestTime) setBestTime(time);
       setState('result');
 
-      const scores = await getTopScores('reaction');
-      if (checkIsTopScore(scores, time, true)) {
-        setShowModal(true);
+      try {
+        const scores = await getTopScores('reaction');
+        if (checkIsTopScore(scores, time, true)) {
+          const ranked = [...scores, { name: 'You', country: 'US', score: time }]
+            .sort((a, b) => a.score - b.score)
+            .slice(0, 5);
+          const rank = ranked.findIndex((s) => s.name === 'You' && s.score === time) + 1;
+          const beatCount = Math.max(0, scores.length - rank + 1);
+          setRankMessage(`You're ranked #${rank}! You beat ${beatCount} ${beatCount === 1 ? 'player' : 'players'}.`);
+          setShowModal(true);
+        }
+      } catch (err) {
+        console.error('Failed to evaluate reaction ranking:', err);
       }
     }
   };
@@ -383,6 +447,7 @@ function ReactionTimeExperience() {
   const reset = () => {
     setState('idle');
     setReactionTime(0);
+    setRankMessage('');
   };
 
   const handleScoreSubmit = async (name: string, country: string) => {
@@ -446,6 +511,7 @@ function ReactionTimeExperience() {
         onSubmit={handleScoreSubmit}
         score={reactionTime}
         unit="ms"
+        rankMessage={rankMessage}
       />
     </div>
   );

@@ -1,7 +1,7 @@
 export async function handler(event) {
-    const JSONBIN_MASTER_KEY = "$2a$10$F9AynfZ5TvPUR.6JsxN9/ONFfSx9jqLbEzNYa3UFV5VWGxKWoITXS";
-    const JSONBIN_ACCESS_KEY = "$2a$10$6dq79KXkdRVIO59Om6sQFu47dFWLxcmfWV40SFQUKZ/TLE4jtDbJy";
-    const BIN_ID = "69afe988aeb53c760cdf1a8d";
+    const JSONBIN_MASTER_KEY = process.env.JSONBIN_MASTER_KEY;
+    const JSONBIN_ACCESS_KEY = process.env.JSONBIN_ACCESS_KEY;
+    const BIN_ID = process.env.JSONBIN_BIN_ID;
 
     const headers = {
         'Access-Control-Allow-Origin': '*',
@@ -11,6 +11,14 @@ export async function handler(event) {
 
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 200, headers, body: '' };
+    }
+
+    if (!JSONBIN_MASTER_KEY || !JSONBIN_ACCESS_KEY || !BIN_ID) {
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: 'Missing JSONBin environment configuration' }),
+        };
     }
 
     try {

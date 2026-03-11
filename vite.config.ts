@@ -24,6 +24,12 @@ export default defineConfig({
           'Referer': 'https://api.groq.com'
         }
       },
+      '/api/chat': {
+        target: 'http://localhost:8888/.netlify/functions/chat',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api\/chat/, ''),
+      },
       '/api/scores': {
         target: 'http://localhost:8888/.netlify/functions/scores',
         changeOrigin: true,

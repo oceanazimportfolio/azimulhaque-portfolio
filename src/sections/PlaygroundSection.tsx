@@ -30,7 +30,10 @@ const COUNTRIES = getData().map(c => ({
 const getTopScores = async (gameId: string): Promise<Score[]> => {
   try {
     const response = await fetch('/api/scores');
-    if (!response.ok) throw new Error('Fetch failed');
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Fetch failed: ${response.status} ${errorText}`);
+    }
     const data = await response.json();
     return data[gameId] || [];
   } catch (err) {
@@ -43,6 +46,7 @@ const saveScore = async (gameId: string, score: Score, ascending: boolean = fals
   try {
     // 1. Get latest scores first
     const response = await fetch('/api/scores');
+    if (!response.ok) throw new Error(`Could not fetch current scores for update: ${response.status}`);
     const allScores = await response.json();
     const gameScores = allScores[gameId] || [];
 
@@ -53,12 +57,21 @@ const saveScore = async (gameId: string, score: Score, ascending: boolean = fals
     // 3. Keep top 5 and upload
     allScores[gameId] = gameScores.slice(0, 5);
 
-    await fetch('/api/scores', {
+    const postResponse = await fetch('/api/scores', {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify(allScores)
     });
+
+    if (!postResponse.ok) {
+      const errorText = await postResponse.text();
+      throw new Error(`Submit failed: ${postResponse.status} ${errorText}`);
+    }
   } catch (err) {
     console.error('Error saving score:', err);
+    alert('Failed to save score. Please try again later.');
   }
 };
 

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { ChatMessage } from '@/types';
 
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
+const GROQ_API_KEY = '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';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 const SYSTEM_PROMPT = `You are an AI recruiter assistant for Azimul Haque's portfolio. Your role is to:
